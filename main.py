@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from db import db
 from models import User
+from redis_queue import publish_event
 import os
 
 postgres_user = os.environ.get('POSTGRES_USER', 'appuser')
@@ -25,6 +26,8 @@ def create_user():
     db.session.add(user)
     db.session.commit()
 
+    publish_event("USER_CREATED", str(user.id), f"User {user.name} created")
+
     return jsonify({
         "id": str(user.id),
         "name": user.name,
@@ -47,6 +50,8 @@ def delete_user(user_id):
 
     db.session.delete(user)
     db.session.commit()
+
+    publish_event("USER_DELETED", str(user_id), f"User {user_id} deleted")
 
     return "", 204
 
