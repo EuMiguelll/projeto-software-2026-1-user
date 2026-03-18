@@ -14,6 +14,26 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 
+@app.route("/events", methods=["POST"])
+def create_event():
+    data = request.json
+
+    event_type = data.get("type")
+    source = data.get("source")
+    description = data.get("description")
+
+    if not event_type or not source or not description:
+        return jsonify({"error": "type, source and description are required"}), 400
+
+    publish_event(event_type, source, description)
+
+    return jsonify({
+        "type": event_type,
+        "source": source,
+        "description": description
+    }), 201
+
+
 @app.route("/users", methods=["POST"])
 def create_user():
     data = request.json
