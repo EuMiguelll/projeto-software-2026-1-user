@@ -80,3 +80,12 @@ Na rota de cadastro de usuário, deve ser adicionado o campo CEP e número da ca
 https://viacep.com.br/ws/{cep}/json/
 
 No banco de dados deve ser salvo o endereço completo do usuário com os campos cep, logradouro,  bairro, localidade e cidade. Além do número que foi enviado pelo usuário.
+
+```python
+python3 -m pytest
+```
+
+
+``` python
+python3 -m pytest --cov=main --cov-report=term-missing -s
+```
