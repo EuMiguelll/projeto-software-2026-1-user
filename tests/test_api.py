@@ -1,3 +1,43 @@
+def test_create_event_success(client):
+    response = client.post("/events", json={
+        "type": "TEST_EVENT",
+        "source": "unit-test",
+        "description": "evento de teste"
+    })
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body == {
+        "type": "TEST_EVENT",
+        "source": "unit-test",
+        "description": "evento de teste"
+    }
+
+
+def test_create_event_missing_description(client):
+    response = client.post("/events", json={
+        "type": "TEST_EVENT",
+        "source": "unit-test"
+    })
+    assert response.status_code == 400
+    assert "error" in response.get_json()
+
+
+def test_create_event_missing_type(client):
+    response = client.post("/events", json={
+        "source": "unit-test",
+        "description": "sem type"
+    })
+    assert response.status_code == 400
+
+
+def test_create_event_missing_source(client):
+    response = client.post("/events", json={
+        "type": "TEST_EVENT",
+        "description": "sem source"
+    })
+    assert response.status_code == 400
+
+
 def test_get_user_404(client):
 
     # Teste de Recuperação
