@@ -48,7 +48,13 @@ jobs:
         key: ${{ secrets.KEY_TEST }}
         port: 22
         script: |
-          docker stop $(docker ps -aq) 2>/dev/null || true
-          docker rm -f $(docker ps -aq) 2>/dev/null || true
-          docker rmi -f $(docker images -aq) 2>/dev/null || true
-          docker run -d -p 80:5000 -e POSTGRES_URL=${{ secrets.POSTGRES_URL }} -e POSTGRES_USER=${{ secrets.POSTGRES_USER }} -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} --network=rede --name users eumiguel/users-ci:${{ github.sha }}
+          docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 != "postgres-users" {print $1}' | xargs -r docker stop 2>/dev/null || true
+          docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 != "postgres-users" {print $1}' | xargs -r docker rm -f 2>/dev/null || true
+          docker images --format '{{.ID}} {{.Repository}}' | awk '$2 != "postgres" {print $1}' | sort -u | xargs -r docker rmi -f 2>/dev/null || true
+          docker run -d -p 80:5000 \
+            -e POSTGRES_URL=${{ secrets.POSTGRES_URL }} \
+            -e POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
+            -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
+            -e AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN }} \
+            -e AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE }} \
+            --network=rede --name users eumiguel/users-ci:${{ github.sha }}
