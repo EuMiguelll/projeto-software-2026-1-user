@@ -48,13 +48,27 @@ jobs:
         key: ${{ secrets.KEY_TEST }}
         port: 22
         script: |
-          docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 != "postgres-users" {print $1}' | xargs -r docker stop 2>/dev/null || true
-          docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 != "postgres-users" {print $1}' | xargs -r docker rm -f 2>/dev/null || true
-          docker images --format '{{.ID}} {{.Repository}}' | awk '$2 != "postgres" {print $1}' | sort -u | xargs -r docker rmi -f 2>/dev/null || true
+          docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 != "postgres-users" && $2 != "redis" {print $1}' | xargs -r docker stop 2>/dev/null || true
+          docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 != "postgres-users" && $2 != "redis" {print $1}' | xargs -r docker rm -f 2>/dev/null || true
+          docker images --format '{{.ID}} {{.Repository}}' | awk '$2 != "postgres" && $2 != "redis" {print $1}' | sort -u | xargs -r docker rmi -f 2>/dev/null || true
+
+          docker ps -a --filter name=^postgres-users$ -q | grep -q . || docker run -d --name postgres-users --network=rede \
+            -e POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
+            -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
+            -e POSTGRES_DB=users \
+            postgres:16
+          docker ps --filter name=^postgres-users$ -q | grep -q . || docker start postgres-users
+          for i in $(seq 1 30); do docker exec postgres-users pg_isready -U ${{ secrets.POSTGRES_USER }} >/dev/null 2>&1 && break; sleep 1; done
+          docker exec postgres-users psql -U ${{ secrets.POSTGRES_USER }} -d users -c "CREATE TABLE IF NOT EXISTS users (id UUID PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE);"
+
+          docker ps -a --filter name=^redis$ -q | grep -q . || docker run -d --name redis --network=rede redis:7-alpine
+          docker ps --filter name=^redis$ -q | grep -q . || docker start redis
+
           docker run -d -p 80:5000 \
             -e POSTGRES_URL=${{ secrets.POSTGRES_URL }} \
             -e POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
             -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
+            -e REDIS_HOST=redis \
             -e AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN }} \
             -e AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE }} \
             --network=rede --name users eumiguel/users-ci:${{ github.sha }}
