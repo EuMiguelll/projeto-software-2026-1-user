@@ -1,19 +1,22 @@
-from flask import Flask, request, jsonify
+import os
+
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+from auth import require_auth
 from db import db
 from models import User
 from redis_queue import publish_event
-import os
-from flask_cors import CORS
+
 
 def create_app():
     app = Flask(__name__)
     CORS(app)
 
-    postgres_user = os.environ.get('POSTGRES_USER', 'appuser')
-    postgres_password = os.environ.get('POSTGRES_PASSWORD', 'apppass')
-    postgres_url = os.environ.get('POSTGRES_URL', 'localhost')
+    postgres_user = os.environ.get("POSTGRES_USER", "appuser")
+    postgres_password = os.environ.get("POSTGRES_PASSWORD", "apppass")
+    postgres_url = os.environ.get("POSTGRES_URL", "localhost")
 
-    # Define o padrão, mas permite que o Pytest sobrescreva depois
     db_uri = f"postgresql://{postgres_user}:{postgres_password}@{postgres_url}:5432/users"
     app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("SQLALCHEMY_DATABASE_URI", db_uri)
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
@@ -21,89 +24,56 @@ def create_app():
     db.init_app(app)
 
     @app.route("/events", methods=["POST"])
+    @require_auth()
     def create_event():
-        data = request.json
+        data = request.json or {}
+        required = ("type", "source", "description")
 
-        event_type = data.get("type")
-        source = data.get("source")
-        description = data.get("description")
-
-        if not event_type or not source or not description:
+        if not all(data.get(k) for k in required):
             return jsonify({"error": "type, source and description are required"}), 400
 
-        publish_event(event_type, source, description)
-
-        return jsonify({
-            "type": event_type,
-            "source": source,
-            "description": description
-        }), 201
+        payload = {k: data[k] for k in required}
+        publish_event(payload["type"], payload["source"], payload["description"])
+        return jsonify(payload), 201
 
     @app.route("/users", methods=["POST"])
+    @require_auth()
     def create_user():
         data = request.json
-
-        user = User(
-            name=data["name"],
-            email=data["email"]
-        )
-
+        user = User(name=data["name"], email=data["email"])
         db.session.add(user)
         db.session.commit()
 
         publish_event("USER_CREATED", str(user.id), f"User {user.name} created")
+        return jsonify(user.to_dict()), 201
 
-        return jsonify({
-            "id": str(user.id),
-            "name": user.name,
-            "email": user.email
-        }), 201
+    @app.route("/users", methods=["GET"])
+    @require_auth()
+    def list_users():
+        return jsonify([u.to_dict() for u in User.query.all()]), 200
 
     @app.route("/users/<uuid:user_id>", methods=["GET"])
+    @require_auth()
     def get_user(user_id):
-        user = User.query.get_or_404(user_id)
-
-        return jsonify({
-            "id": str(user.id),
-            "name": user.name,
-            "email": user.email
-        }), 200
+        return jsonify(User.query.get_or_404(user_id).to_dict()), 200
 
     @app.route("/users/<string:email>/email", methods=["GET"])
+    @require_auth()
     def get_user_by_email(email):
-        user = User.query.filter_by(email=email).first_or_404()
-
-        return jsonify({
-            "id": str(user.id),
-            "name": user.name,
-            "email": user.email
-        }), 200
+        return jsonify(User.query.filter_by(email=email).first_or_404().to_dict()), 200
 
     @app.route("/users/<uuid:user_id>", methods=["DELETE"])
+    @require_auth()
     def delete_user(user_id):
         user = User.query.get_or_404(user_id)
-
         db.session.delete(user)
         db.session.commit()
 
         publish_event("USER_DELETED", str(user_id), f"User {user_id} deleted")
-
         return "", 204
 
-    @app.route("/users", methods=["GET"])
-    def list_users():
-        users = User.query.all()
-
-        return [
-            {
-                "id": str(user.id),
-                "name": user.name,
-                "email": user.email
-            }
-            for user in users
-        ], 200
-
     return app
+
 
 app = create_app()
 

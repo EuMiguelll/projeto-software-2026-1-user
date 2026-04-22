@@ -1,10 +1,13 @@
 # tests/conftest.py
+import os
+
+os.environ["AUTH_DISABLED"] = "1"
+
 import pytest
 from testcontainers.postgres import PostgresContainer
-from main import app as flask_app
-from main import create_app
+
 from db import db
-import os
+from main import create_app
 
 @pytest.fixture(scope="session")
 def postgres_container():

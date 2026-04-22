@@ -3,6 +3,8 @@ Flask-SQLAlchemy==3.1.1
 psycopg2-binary==2.9.11
 redis==5.2.1
 flask-cors
+authlib
+requests
 pytest
 pytest-cov
 testcontainers
