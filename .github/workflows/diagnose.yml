@@ -1,0 +1,40 @@
+name: Diagnose server
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and collect diagnostics
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST_TEST }}
+          username: "ubuntu"
+          key: ${{ secrets.KEY_TEST }}
+          port: 22
+          script: |
+            echo "===== docker ps -a ====="
+            docker ps -a
+            echo ""
+            echo "===== docker network ls ====="
+            docker network ls
+            echo ""
+            echo "===== docker network inspect rede ====="
+            docker network inspect rede || echo "rede não existe"
+            echo ""
+            echo "===== docker logs users --tail 100 ====="
+            docker logs users --tail 100 2>&1 || echo "container users não existe"
+            echo ""
+            echo "===== docker logs postgres-users --tail 20 ====="
+            docker logs postgres-users --tail 20 2>&1 || echo "container postgres-users não existe"
+            echo ""
+            echo "===== tabelas do DB users ====="
+            docker exec postgres-users psql -U appuser -d users -c '\dt' 2>&1 || echo "falhou ao listar tabelas (container ou DB ausente)"
+            echo ""
+            echo "===== DBs disponíveis ====="
+            docker exec postgres-users psql -U appuser -l 2>&1 || echo "falhou ao listar DBs"
+            echo ""
+            echo "===== df -h (espaço em disco) ====="
+            df -h
